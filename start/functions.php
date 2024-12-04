@@ -1,33 +1,36 @@
 <?php
 
+require_once __DIR__.'/lib/Ship.php';
+
 function get_ships()
 {
-    return array(
-        'starfighter' => array(
-            'name' => 'Jedi Starfighter',
-            'weapon_power' => 5,
-            'jedi_factor' => 15,
-            'strength' => 30,
-        ),
-        'cloakshape_fighter' => array(
-            'name' => 'CloakShape Fighter',
-            'weapon_power' => 2,
-            'jedi_factor' => 2,
-            'strength' => 70,
-        ),
-        'super_star_destroyer' => array(
-            'name' => 'Super Star Destroyer',
-            'weapon_power' => 70,
-            'jedi_factor' => 0,
-            'strength' => 500,
-        ),
-        'rz1_a_wing_interceptor' => array(
-            'name' => 'RZ-1 A-wing interceptor',
-            'weapon_power' => 4,
-            'jedi_factor' => 4,
-            'strength' => 50,
-        ),
-    );
+    $ships = array();
+
+    $ship = new Ship('Jedi Starfighter');
+    $ship->setWeaponPower(5);
+    $ship->setJediFactor(15);
+    $ship->setStrength(30);
+    $ships['starfighter'] = $ship;
+
+    $ship = new Ship('CloakShape Fighter');
+    $ship->setWeaponPower(2);
+    $ship->setJediFactor(2);
+    $ship->setStrength(70);
+    $ships['cloakshape_fighter'] = $ship;
+
+    $ship = new Ship('Super Star Destroyer');
+    $ship->setWeaponPower(70);
+    $ship->setJediFactor(0);
+    $ship->setStrength(500);
+    $ships['super_star_destroyer'] = $ship;
+
+    $ship = new Ship('RZ-1 A-wing interceptor');
+    $ship->setWeaponPower(4);
+    $ship->setJediFactor(4);
+    $ship->setStrength(50);
+    $ships['rz1_a_wing_interceptor'] = $ship;
+
+    return $ships;
 }
 
 /**
@@ -35,10 +38,10 @@ function get_ships()
  *
  * @return array With keys winning_ship, losing_ship & used_jedi_powers
  */
-function battle(array $ship1, $ship1Quantity, array $ship2, $ship2Quantity)
+function battle(Ship $ship1, $ship1Quantity, Ship $ship2, $ship2Quantity)
 {
-    $ship1Health = $ship1['strength'] * $ship1Quantity;
-    $ship2Health = $ship2['strength'] * $ship2Quantity;
+    $ship1Health = $ship1->getStrength() * $ship1Quantity;
+    $ship2Health = $ship2->getStrength() * $ship2Quantity;
 
     $ship1UsedJediPowers = false;
     $ship2UsedJediPowers = false;
@@ -58,8 +61,8 @@ function battle(array $ship1, $ship1Quantity, array $ship2, $ship2Quantity)
         }
 
         // now battle them normally
-        $ship1Health = $ship1Health - ($ship2['weapon_power'] * $ship2Quantity);
-        $ship2Health = $ship2Health - ($ship1['weapon_power'] * $ship1Quantity);
+        $ship1Health = $ship1Health - ($ship2->getWeaponPower() * $ship2Quantity);
+        $ship2Health = $ship2Health - ($ship1->getWeaponPower() * $ship1Quantity);
     }
 
     if ($ship1Health <= 0 && $ship2Health <= 0) {
@@ -84,9 +87,9 @@ function battle(array $ship1, $ship1Quantity, array $ship2, $ship2Quantity)
     );
 }
 
-function didJediDestroyShipUsingTheForce(array $ship)
+function didJediDestroyShipUsingTheForce(Ship $ship)
 {
-    $jediHeroProbability = $ship['jedi_factor'] / 100;
+    $jediHeroProbability = $ship->getJediFactor() / 100;
 
     return mt_rand(1, 100) <= ($jediHeroProbability*100);
 }
