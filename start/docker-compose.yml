@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: php-container
+    volumes:
+      - ./app:/var/www/html
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - DB_NAME=oo_battle
+      - DB_USER=root
+      - DB_PASSWORD=
+      
+  mysql:
+    image: mysql:latest
+    container_name: mysql-container
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "" # Ustawienie pustego hasła dla użytkownika root
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes" # Zezwolenie na puste hasło
+      MYSQL_DATABASE: oo_battle
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:

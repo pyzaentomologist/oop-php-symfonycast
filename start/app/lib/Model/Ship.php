@@ -3,6 +3,7 @@
 class Ship
 {
   private $name;
+  private $id;
   private $weaponPower = 0;
   private $jediFactor = 0;
   private $strength = 0;
@@ -28,6 +29,14 @@ class Ship
   public function getName()
   {
     return $this->name;
+  }
+
+  /**
+   * @return integer
+   */
+  public function getId()
+  {
+    return $this->id;
   }
 
   public function getWeaponPower()
@@ -74,6 +83,14 @@ class Ship
   public function setName($name)
   {
     $this->name = $name;
+  }
+
+  /**
+   * @param integer $id
+   */
+  public function setId($id)
+  {
+    $this->id = $id;
   }
 
   public function setWeaponPower($weaponPower)
