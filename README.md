@@ -426,3 +426,88 @@ public function getBattleManager()
 
 Klasy które zarządzają kodem, ale nie przechowują danych (PDO, BattleManager, ShipLoader) powinny być przechowywane w scentralizowanym miejscu (Service).
 Model odpowiada za przechowywanie danych.
+
+## OOP (Course 3): Inheritance, Abstract Classes, Interfaces and other amazing things
+
+### Rozszerzanie
+
+Rozszerzanie klasy przez dodanie słowa kluczowego extends i nazwy klasy:
+
+```
+class RebelShip extends Ship
+```
+
+### Nadpisywanie
+
+RebelShip może nadpisać właściwości które dziedziczy po klasie Ship np. isFunctional zawsze moze być true.
+
+### Widoczność właściwości protected
+
+Protected umożliwia dostęp do właściwości klasy głównej, po której dziedziczą inne klasy. Jest połaczeniem public i privete. 
+Publiczna dla dzieci, prywatna dla kodu poza nimi.
+Lepszym rozwiązaniem niż używanie protected jest korzystanie z getterów i setterów.
+
+### Wywoływanie metod rodzica
+
+Wywołujemy przez użycie **parent::** zamiast **$this**
+
+```
+public function getNameAndSpecs($useShortFormat = false)
+{
+  $val = parent::getNameAndSpecs($useShortFormat);
+  $val .= ' (Rebel)';
+  
+  return $val;
+}
+```
+
+Podczas nadpisywania metody rodzica, metoda rodzica nigdy nie jest wykonywana. Wykonywana jest tylko metoda potomka, która bazuje na kodzie metody rodzica.
+
+### Tworzenie abstrakcyjnego okrętu (abstract)
+
+Klasa abstrakcyjna w tym kontekście ma pomóc w utworzeniu wzorca klasy, który będzie dziedziczony przez inne klasy.
+
+### Klasa abstrakcyjna
+
+Wstrzykiwanie abstrakcyjnych metod - takich któe muszą znaleźć się w klasach potomnych:
+```
+abstract public function getJediFactor();
+  
+abstract public function isFunctional();
+```
+
+Metody abstrakcyjne muszą znaleźć się w abstrakcyjnej klasie
+
+```
+abstract class AbstractShip
+```
+
+### Zniszczony statek
+
+Utworzenie nowej klasy która musi mieć metody zdefiniowane jako abstrakcyjne w klasie abstrakcyjnej po której dziedziczy.
+
+### Wydzielenie odpowiedzialności w klasie
+
+Przeniesienie odpytywanie PDO do osobnej klasy, przez co ShipLoader może przyjmować dane zarówno z bazy jak np. z pliku json.
+Kod stał się reużywalny i przejrzysty.
+
+### AbstractShipStorage
+
+Utworzenie klasy AbstractShipStorage w celu nadania wzoru klasom potomnym, które maja za zadanie pobierać dane, czy to z pliku, czy z bazy, jednak lepsze do tego celu będą Interfejsy.
+
+### Interface
+
+Zamiast słowa kluczowego extends używa sie implements. Wszystkie metody interfejsów są abstrakcyjne, nie zawierają żadnej logiki, tylko wartości abstrakcyjne.
+Dziedziczenie po wielu interfejsach jest po przecinku: 
+
+```
+class PsoShipStorage implements ShipStorageInterface, ArrayAccess
+```
+
+Jeśli klasa ma dziedziczyć po klasie abstrakcyjnej (zawsze max po jednej) i po interfejscach to skłądnia wygląda następująco:
+
+```
+class RebelShip extends AbstractShip implements ShipInterface, WeaponShipInterface
+{
+}
+```

@@ -5,6 +5,9 @@ $container = new Container($configuration);
 $shipLoader = $container->getShipLoader();
 $ships = $shipLoader->getShips();
 
+$brokenShip = new BrokenShip("Broken");
+$ships[] = $brokenShip;
+
 $errorMessage = '';
 if (isset($_GET['error'])) {
     switch ($_GET['error']) {
@@ -62,6 +65,8 @@ if (isset($_GET['error'])) {
                         <th>Weapon Power</th>
                         <th>Jedi Factor</th>
                         <th>Strength</th>
+                        <th>Status</th>
+                        <th>Team</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,11 +78,12 @@ if (isset($_GET['error'])) {
                             <td><?php echo $ship->getStrength(); ?></td>
                             <td>
                                 <?php if ($ship->isFunctional()):?>
-                                <i class="fa fa-sun-o"></i>
+                                    <i class="fa fa-sun-o"></i>
                                 <?php else:?>
-                                <i class="fa fa-cloud"></i>
+                                    <i class="fa fa-cloud"></i>
                                 <?php endif; ?>
                             </td>
+                            <td><?php echo $ship->getType(); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
