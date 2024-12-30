@@ -1,5 +1,7 @@
 <?php
 
+namespace Model;
+
 abstract class AbstractShip
 {
   private $name;
@@ -97,7 +99,7 @@ abstract class AbstractShip
   public function setStrength($strength)
   {
     if (!is_numeric($strength)) {
-      throw new Exception('Invalid strength passed '.$strength);
+      throw new \Exception('Invalid strength passed '.$strength);
     }
     $this->strength = $strength;
   }
@@ -105,5 +107,15 @@ abstract class AbstractShip
   public function setType($team)
   {
     $this->team = $team;
+  }
+
+  public function __toString()
+  {
+    return $this->getName();
+  }
+
+  public function __get($propertyName)
+  {
+    return $this->$propertyName;
   }
 }

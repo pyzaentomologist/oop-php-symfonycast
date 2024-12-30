@@ -511,3 +511,148 @@ class RebelShip extends AbstractShip implements ShipInterface, WeaponShipInterfa
 {
 }
 ```
+
+## OOP (course 4): Static methods, Namespaces, Exceptions & Traits
+
+### Piękno stałych w klasach
+
+Stałe są potrzebne gdy:
+
+- dane są używane wielokrotnie
+- dane są używan epoza klasą
+- jeśli ktoś zrobi literówkę to wynik będzie drastycznie inny?
+- wszystkie możliwe wartości powinny być w jednym miejscu
+
+### Metody statyczne
+
+Statyczne metody są po to, żeby nie dało się zmienić tej właściwości, ani w klasie rodzica (np. abstrakcyjnej), ani w klasach potomnych.
+Odwołanie do właściwości statycznych odbywają się przez słowo kluczowe self self::TYPE_NO_JEDI
+
+### Metody statyczne czy niestatyczne?
+
+Przykład użycia właściwości niestatycznej:
+
+```
+$battleManager = $container->getBattleManager();
+$battleTypes = $battleManager->getAllBattleTypesWithDescriptions();
+
+<?php foreach ($battleTypes as $battleType => $typeText): ?>
+<option value="<?php echo $battleType ?>"><?php echo $typeText; ?></option>
+<?php endforeach; ?>
+```
+
+Przykład użycia właściwości statycznej:
+
+```
+$battleTypes = BattleManager::getAllBattleTypesWithDescriptions();
+
+<?php foreach ($battleTypes as $battleType => $typeText): ?>
+<option value="<?php echo $battleType ?>"><?php echo $typeText; ?></option>
+<?php endforeach; ?>
+```
+
+### Namespace
+
+Namespace jest po to, żeby wykluczyć kolizje nazw klas z różnych bibliotek.
+Deklaruje się je przez słowo kluczowe namespace, a używa sie przez use.
+
+### Autoloading Awesomeness
+
+Autoloadery przeważnie przyśpieszają aplikację ponieważ korzystamy tylko z używanych referencji w żądaniu.
+Przypadek w którym autoloader może spowolnić aplikację to brak namespaceów. Autoloader może mieć zbyt dużo plików do przeszukania, a namespace znacząco przyśpiesza pracę.
+
+Natywne tworzaenie autoloadera w bootstrap.php:
+
+```
+spl_autoload_register(function($className) {
+  $path = __DIR__.'/lib/'.str_replace('\\', '/', $className).'.php';
+
+  if (file_exists($path)) {
+    require $path;
+  }
+});
+```
+
+### Komenda "use"
+
+Nie jest potrzebny dla klas będących w tym samym namespace.
+
+backslash służy jako separator namespaceów.
+
+### Namespaces i podstawowe klasy PHP
+
+Skrótem dla klas ogólnych PHP jak np. PDO jest zamieszczenie przed nazwą backslash \
+
+### Composer autoloading
+
+Wspólne nazewnictwo klas i plików zawierających klasy to standard PSR-0 - Część standardów PHP FIG.
+
+PSR-4 odpowiada za standaryzacje autoloadera.
+
+### Obsługa wyjątków
+
+Wyjątki rzucamy za pomocą
+> throw new Exception
+
+Exception jest wewnątrzną klasą php więc wystarczy ją zadeklarować przez \Exception.
+
+### Różne klasy Exception
+
+Przykładem jest tu PDOException która jest rozszerzeniem klasy Exception.
+
+### Magiczne metody: ```__toString(), __get(), __set()```
+
+Metoda __toString() odpowiada za zwracanie jako string wybranej właściwości obiektu.
+
+```
+public function __toString()
+{
+  return $this->getName();
+}
+```
+
+Metoda __get() służy do pobrania właściwości z obiektu
+
+```
+public function __get($propertyName)
+{
+  return $this->$propertyName;
+}
+```
+
+Medoda __set() działa jak get, ale łamią zasady OOP i nie warto ich stosować.
+
+### ArrayAccess: Obsługa obiektu jako tablicy
+
+W obiekcie trzeba zaimplementować dziedziczenie po \ArratAccess oraz metody tablicowe:
+offsetExists(), offsetGet(), offsetSet(), offsetUnset().
+
+### IteratorAggregate: Pętla na obiekcie
+
+Implementację ShipsCollection rozszerzono o IteratorAggregate
+
+> class ShipCollection implements \ArrayAccess, \IteratorAggregate
+
+Dzięki temu można nadać iteratory obiektom i wykonywać operacje na właściwościach obiektu jak na tablicy:
+
+```
+public function removeAllBrokenShips()
+{
+  foreach ($this->ships as $key => $ship) {
+    if (!$ship->isFunctional()) {
+      unset($this->ships[$key]);
+    }
+  }
+}
+```
+
+### Trait: Horyzontalna reużywalność
+
+Trait tworzy sie przy pomocy słowa kluczowego trait zamiast class.
+Definiuje się właściwości które mają być dziedziczone horyzontalnie, a ich użycie nastepuje przez użycie słowa kluczowego use + nazwa traitu:
+
+> use SettableJediFactorTrait
+
+Jeśli modeluje się ten sam rodzaj obiektór np. planety to lepiej używać dziedziczenia klas, a jeśli mamy te same metody dla mniej spokrenionych elementów jak np. planety i meteoryty to lepiej użyć trateów.
+
+### Kompozycja obiektów

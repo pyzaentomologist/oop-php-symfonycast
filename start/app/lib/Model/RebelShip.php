@@ -1,5 +1,9 @@
 <?php
 
+namespace Model;
+
+use Model\AbstractShip;
+
 class RebelShip extends AbstractShip
 {
   public function getFavouriteJedi()

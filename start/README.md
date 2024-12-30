@@ -24,3 +24,12 @@ Pull up the new site by going to:
 
     http://localhost:8000
 
+W celu odpalenia projektu trzeb wykonać komendę
+
+> cd app && composer install && composer update
+> cd ..
+> docker-compose up -d
+
+Projekt powinien być uruchomiony na
+
+> localhost:8080

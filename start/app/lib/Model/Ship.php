@@ -1,8 +1,12 @@
 <?php
 
+namespace Model;
+
+use Model\AbstractShip;
+
 class Ship extends AbstractShip
 {
-  private $jediFactor = 0;
+  use SettableJediFactorTrait;
 
   private $underRapair;
 
@@ -15,15 +19,5 @@ class Ship extends AbstractShip
   public function isFunctional()
   {
     return !$this->underRapair;
-  }
-
-  public function getJediFactor()
-  {
-    return $this->jediFactor;
-  }
-
-  public function setJediFactor($jediFactor)
-  {
-    $this->jediFactor = $jediFactor;
   }
 }
