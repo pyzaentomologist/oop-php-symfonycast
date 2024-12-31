@@ -656,3 +656,14 @@ Definiuje się właściwości które mają być dziedziczone horyzontalnie, a ic
 Jeśli modeluje się ten sam rodzaj obiektór np. planety to lepiej używać dziedziczenia klas, a jeśli mamy te same metody dla mniej spokrenionych elementów jak np. planety i meteoryty to lepiej użyć trateów.
 
 ### Kompozycja obiektów
+
+Dodanie klasy PDOShipStorage do klasy logującej:
+
+```
+$this->shipStorage = new PdoShipStorage($this->getPDO());
+
+// use "composition": put the PdoShipStorage inside the LoggableShipStorage
+$this->shipStorage = new LoggableShipStorage($this->shipStorage);
+```
+
+Dzięki kompozycji rozszerzamy możliwości klasy docelowej, przydatne podczas używania bibliotek zewnętrznych.
