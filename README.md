@@ -667,3 +667,232 @@ $this->shipStorage = new LoggableShipStorage($this->shipStorage);
 ```
 
 Dzięki kompozycji rozszerzamy możliwości klasy docelowej, przydatne podczas używania bibliotek zewnętrznych.
+
+## (course 5) Write SOLID Code & Impress your Friends
+
+### SOLID - wady. zalety i reaqlne wykorzystanie
+
+- Single-responsibility principle
+- Open-closed principle
+- Liskov Substitution principle
+- Interface Segregation principle
+- Dependency Inversion principle
+
+Ważna dyskucja na temat wad SOLID: https://dannorth.net/cupid-the-back-story/
+
+Dodałem kontener z php, zmodyfikowałem env oraz kontener z mysql i uruchomiłem projekt.
+
+### Single-Responsibility Principle - czym jest
+
+- Moduł powinienen mieć tylko jeden powód do zmiany - funkcja lub klasa powinny byćodpowiedzialne za 1 zadanie. **Zbieraj to co zmienia się z tego samego powodu i rozdzielaj to co zmienia się z innego powodu**
+
+Dodano obsługę generowania kluczy oraz wysyłania maili z potwierdzeniem rejestracji do metody odpowiadającej za rejestrację. To złamanie zasady SRP
+
+### SRP: Odpowiedzialności
+
+Kod można podzielić na kilka czynności jakie wykonuje (tworzenie klucza, rejestracja użytkownika, tworzenie maila, wysłanie maila), lub na parę grup odpowiedzialności (biznesowo: tworzenie użytkownika i wysłanie maila). Przy SRP ważne jest, żeby nie przesadzić z podziałem odpowiedzialności.
+
+### SRP: Refaktor
+
+Odzielenie od UserManager::register() odpowiedzilności za generowanie linku z potwiedzeniem i zmiana nazwy register() na create().
+
+### SRP: Podsumowanie
+
+SRP łatwo zbyt skomplikować np. przez przekoszenie każdego urywka kodu do osobnej klasy. Oprócz SRP ważna jest kohazja, która mówi o tym, że logika która jest ze spobą powiazana (spójna) powinna być trzymana razem. Dobrym rozgraniczeniem jest to czy wg. mnie kod pasuje do siebie "mieści mi się w głowie".
+
+### OCP: Open–Closed Principle
+
+Moduł powinien być otwarty na rozszerzenia, ale zamknięty na modyfikacje (zmieniasz co może zrobić klasa, bez zmiany kodu).
+
+Refaktoring serwisu SightingScorer.
+
+### OCP: Autoconfiguration & tagged_iterator
+
+SightingScorer nie jest skonfigurowany z klasami które obsługują konkretne liczniki. Problem można rozwiązać na dwa sposoby:
+
+Ręcznie modyfikując services.yaml:
+
+```
+App\Service\SightingScorer:
+        arguments:
+            $scoringFactors:
+                - '@App\Scoring\TitleFactor'
+                - '@App\Scoring\DescriptionFactor'
+                - '@App\Scoring\CoordinatesFactor'
+```
+
+Lub korzystając z tagged_iterator w src/Kernel:
+
+```
+protected function build(ContainerBuilder $container)
+{
+    parent::build($container);
+
+    $container->registerForAutoconfiguration(ScoringFactorInterface::class)
+        ->addTag('scoring.factor');
+}
+```
+
+W services.yaml
+
+```
+App\Service\SightingScorer:
+        arguments:
+            $scoringFactors: !tagged_iterator scoring.factor
+```
+
+W klasie SightingScorer trzeba zmienić w konstruktorze typ parametru na iterable
+
+### OCP: Podsumowanie
+
+W OCP wykorzystano wzorzec wstrzykiwania tablicy lub tablicy iteracyjnej zamiast hardcodowania wszystkich metod w logice klasy.
+Podobne wzorce to strategia oraz szblon.
+
+OCP ma trzy główne wady:
+
+- zakłada, że kod nie będzie się zmieniał ani rozwijał
+- dodatkowa abstrakcja która zaciemnia kod - jak w przypadku kierowania ruchu przez services.yaml
+- przestażała metoda z czasów gdy zmiany były bardzo kosztowne
+
+Kod z OCP jest łatwiejszy do testowania, ale stosowanie tej zasady jest jak w przypadku całego SOLID "Jak Ci pasuje".
+
+### LSP: Liskov Substitution Principle
+
+Klasa powinna zachowywać się w sposób, jakiego oczekuje większość użytkowników: powinna zachowywać się zgodnie z zamierzeniami swojej klasy nadrzędnej lub interfejsu.
+
+4 zasady:
+
+- Po pierwsze: nie można zmienić typu chronionej właściwości.
+- Po drugie: nie można zawęzić wskazówki dotyczącej typu argumentu. Na przykład, jeśli klasa nadrzędna używa wskazówki dotyczącej typu obiektu, nie można zawęzić tego w podklasie, wymagając czegoś bardziej szczegółowego, na przykład obiektu DateTime.
+- Po trzecie: co jest zarówno podobne, jak i przeciwne do poprzedniej reguły, nie można rozszerzyć typu zwrotu. Jeśli klasa nadrzędna twierdzi, że metoda zwraca obiekt DateTime, nie można tego zmienić w podklasie, aby nagle zwrócić coś szerszego, jak dowolny obiekt.
+- Po czwarte: powinieneś przestrzegać reguł swojej klasy nadrzędnej – lub interfejsu – dotyczących tego, czy pod pewnymi warunkami powinieneś zgłosić wyjątek.
+
+### LSP: Niespodziewane wyjątki
+
+Jeśli interfejs nie przewiduje np. rzucania błędami w interfejsie (przez dodanie komentarza), to nie powinno być tego rzacania błędem w klasach dziedziczących po tym interfejsie:
+
+```
+interface ScoringFactorInterface
+{
+  /**
+   * Return the score the should be added to the overall score
+   * 
+   * This method should not throw an exception for any normal reason.
+   */
+  public function score(BigFootSighting $sighting): int;
+}
+```
+
+Zamiast rzucenia błędem zwracam 0, zgodnie z założeniem:
+
+```
+class PhotoFactor implements ScoringFactorInterface
+{
+  public function score(BigFootSighting $sighting): int
+  {
+    if (count($sighting->getImages()) === 0) {
+      return 0;
+    }
+    $score = 0;
+    foreach ($sighting->getImages() as $image) {
+      $score += rand(1, 100); // todo analyze image
+    }
+    return $score;
+  }
+}
+```
+
+### LSP: Zastępowanie klas
+
+Zastąpienie np. w celu rozszerzenia klasy w całym projekcie:
+
+Dodanie klasy do services.yaml:
+
+```
+App\Service\SightingScorer:
+  //tu dodano
+  class: App\Service\DebuggableSightingScorer
+  arguments:
+    $scoringFactors: !tagged_iterator scoring.factor
+```
+
+Utworzenie nowej klasy:
+
+```
+<?php
+namespace App\Service;
+use App\Entity\BigFootSighting;
+use App\Model\BigFootSightingScore;
+class DebuggableSightingScorer extends SightingScorer
+{
+    public function score(BigFootSighting $sighting): BigFootSightingScore
+    {
+        return parent::score($sighting);
+    }
+}
+```
+
+### LSP: Jakie zmiany *są* dopuszczalne?
+
+Jako agryment mogę zmienić typ: BigFootSighting $sighting -> object $sighting, rozrzerzając go, odwrotnie co do wartości którą mogę wzrócić. Jeśli ma być zwracany obiekt, to mogę go zawęzić do BigFootSighting, ale nie mogę już rozszerzyć BigFootSighting do typu object.
+
+### LSP: Podsumowanie i aliasy
+
+Potrzebne by.ło utworzenie aliasu przekierowującego SightingScorer na DebuggableSightingScorer
+
+```
+App\Service\DebuggableSightingScorer: '@App\Service\SightingScorer'
+```
+
+### Interface Segregation Principle
+
+Buduj małe, wyspecjalizowane klasy zamiast wielkich, wielofunkcyjnych klas.
+
+### ISP: Refaktor i podsumowanie
+
+Po wydzieleniu osobnego interface trzeba go zarejestrować w services.yaml i Kernel.php, żeby był iterowalny.
+
+Trzy powody dla których ISP jest ważny:
+
+- Nazewnictwo - podział na mniejsze kawałki kodu pozwala na bardziej opisowe nazwy klas.
+- Jest czujnikiem łamania zasady SRP - Jeśli da się zauważyć, że często korzysta się tylko z jednej lub dwóch metod publicznych danej klasy, a pozostałe nie są wykorzystywane, to jest sygnał czy ISP nie zostało złamane.
+- Zależności są lżejsze
+
+### Dependency Inversion Principle
+
+Klasy powinny zależeć od interfejsów, a nie od konkretnych klas.
+
+Interfejsy te powinny być projektowane przez klasę, która ich używa, a nie przez klasy, które je implementują.
+
+Czyli wysokopoziomowa logika powinna być oddzielona od niskopoziomowej. Np. kod który stosuje regex powinien być osobno od kodu który liczy ile razy dany regex został wywołany.
+
+### DIP - refaktor
+
+Komenda do śledzenia automatycznych powiązań:
+
+./bin/console debug:autowiring Comment --all
+
+Komenda pokazuje powiązania klas i interfaceów które nawiązują do "Comment"
+
+### DIP - podsumowanie
+
+Dzięki DIP klasa która wykorzystuje inną klasę dziedziczącą po określonym interfejsie nie jest zależna od klasy, a od interfejsu który może być dziedziczony przez dowolną klasę.
+
+Ta zasada może być uciążliwa gdy dziedziczy się po jednym interfejsie na każdą klasę.
+
+Dobre praktyki:
+
+- udostępnianie kodu
+- implementacja przez wiele klas
+
+Złe praktyki:
+
+- interfejs nie jest implementowany przez wiele klas, a tylko przez jedną - tego należy unikać
+
+Zasady:
+
+- SRP: Pisz klasy tak, żeby były spójne i "mieściły się w Twojej głowie"
+- OCP: Projektuj klasy tak, żeby zmiana ich zachowania nie wymagała zmiany kodu
+- LSP: Jeśli klasa rozszerza klasę bazową lub implementuje interfejs, niech zachowuje się tak jak została zaprojektowana
+- ISP: Jeśli klasa ma wielkie interfejsy (wiele metod) i jest często używana część z nich to powinna zostać podzielona na mniejsze części
+- DIP: Preferuj interfejsy wskazujące typy dla klas wysokiego poziomu, któa w rzeczywistości będzie z niego korzystać, a nie dla klas niskiego poziomu która go zaimplementuje. Ale najlepiej yużywać tego tylko gdy interfejs jest wykorzystywany przez wiele klas wyższego poziomu, inaczej mogą bezpośrednio korzystać z klas niskiego poziomu.
