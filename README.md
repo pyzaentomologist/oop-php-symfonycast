@@ -896,3 +896,311 @@ Zasady:
 - LSP: Jeśli klasa rozszerza klasę bazową lub implementuje interfejs, niech zachowuje się tak jak została zaprojektowana
 - ISP: Jeśli klasa ma wielkie interfejsy (wiele metod) i jest często używana część z nich to powinna zostać podzielona na mniejsze części
 - DIP: Preferuj interfejsy wskazujące typy dla klas wysokiego poziomu, któa w rzeczywistości będzie z niego korzystać, a nie dla klas niskiego poziomu która go zaimplementuje. Ale najlepiej yużywać tego tylko gdy interfejs jest wykorzystywany przez wiele klas wyższego poziomu, inaczej mogą bezpośrednio korzystać z klas niskiego poziomu.
+
+## (course 6) Design Patterns for Fun and Proficiency
+
+### Wzorce projektowe i ich typy
+
+Typy wzorców:
+
+- Wzorce tworzące (creational patterns) pomagające tworzyć instancje obiektów:
+  - Factory Pattern
+  - Builder Pattern
+  - Singleton Pattern
+- Wzorce strukturalnie (structural patterns) pomagające organizować zależności pomiedzy obiektami np. dziedziczenie:
+  - Decorator Pattern
+- Wzorce zachowania (behavioral patterns) pomagające w rozwiązaniu problemów w komunikacji pomiędzy powiązanymi obiektami. Chodzi o podział na mniejsze, wyspecjalizowane klasy zamiast jednej wielkiej:
+  - Stategy Pattern
+  - Observer Pattern
+
+### Wzorzec strategia
+
+Wzorzec strategii pozwala na przepisanie części klasy z zewnątrz.
+
+Czyli w klasie serwisu mogę w konstruktorze użyć interfejsu. Później w odpowiedniej metodzie wchodzę do obiektu z serwisu i wywołuję jego metodę.
+Mogę mieć kilka klas implementujących interfejs, a serwis nie wie z której klasy będę korzystał, to zostaje rostrzygnięte gdzieś w kodzie podczas wywołania nowej instancji klasy seriwu i podanie do niego odpowiedniej klasy implementującej interfejs.
+
+### Wzorzec strategia cz.2: Korzyści
+
+Wzorzec strategii współgra z zasadami solid: SRP i OCP.
+
+- W przypadku SRP umożliwia hermetyzację algorytmów w (tj. oddzielenie kodu na) oddzielne klasy. Zatem każda klasa może następnie skupić się na „jednej” odpowiedzialności. Następnie wzorzec strategii pomaga tym klasom łączyć się i współpracować.
+- W przypadku OCP wzorzec strategii daje nam możliwość zmiany zachowania klasy bez konieczności modyfikowania jej kodu.
+
+### Wzorzec "budowniczy/konstruktor"
+
+Twórczy wzorzec projektowy, który umożliwia budowanie i konfigurowanie złożonych obiektów krok po kroku.
+Wzór umożliwia tworzenie różnych typów i reprezentacji obiektu przy użyciu tego samego kodu konstrukcyjnego.
+
+### Usprawnienia dzięki builderowi
+
+Chodzi o to, żeby rozszerzyć możliwości klasy i nie dodawać właściwości bezpośrednio do kontruktora tylko za pomocą setterów.
+
+```
+'fighter' => new Character(90, 12, new ShieldType(), new TwoHandedSwordType()),
+```
+
+```
+'fighter' => $this->createCharacterBuilder()
+  ->setMaxHealth(90)
+  ->setBaseDamage(12)
+  ->setAttackType('sword')
+  ->setArmorType('shield')
+  ->buildCharacter(),
+```
+
+Dzięki temu logika przypisywania ataków lub uzbrojenia została wydzielona do osobnej metody w specjalnej klasie. Klasa GameApplication zrobiła się czystsza.
+
+### Builder w Symfony oraz z wzorcem fabryki (Factory)
+
+Factory jest klasą która służy do tworzenia innych klas.
+
+W kontruktorze GameApplication dodaję Factory i metodę z Factory, która korzysta z buildera:
+
+```
+
+class GameApplication
+{
+    public function __construct(private CharacterBuilderFactory $characterBuilderFactory)
+    {
+    }
+
+    private function createCharacterBuilder(): CharacterBuilder
+    {
+        return $this->characterBuilderFactory->createBuilder();
+    }
+}
+```
+
+Dzięki temu, że Factory jest wtrzykiwane w konstruktorzer GameApplication, Symfony wie, że CharacterBuilderFactory nie wymaga loggera w zależnościach od rodzica, tylko od service containera.
+Zadaniem Factory jest wstrzykiwanie Loggera do Buildera:
+
+```
+class CharacterBuilderFactory
+{
+  public function __construct(private LoggerInterface $logger)
+  {
+  }
+  
+  public function createBuilder(): CharacterBuilder
+  {
+    return new CharacterBuilder($this->logger);
+  }
+}
+```
+
+Logger jest wymagany przez builder:
+
+```
+class CharacterBuilder
+{
+  public function __construct(private LoggerInterface $logger)
+  {
+  }
+  public function buildCharacter(): Character
+  {
+      $this->logger->info('Creating a character!', [
+          'maxHealth' => $this->maxHealth,
+          'baseDamage' => $this->baseDamage,
+      ]);
+
+      $attackTypes = array_map(fn(string $attackType) => $this->createAttackType($attackType), $this->attackTypes);
+
+      if (count($attackTypes) === 1) {
+          $attackType = $attackTypes[0];
+      } else {
+          $attackType = new MultiAttackType($attackTypes);
+      }
+  
+      return new Character(
+          $this->maxHealth,
+          $this->baseDamage,
+          $this->createArmorType(),
+          $attackType,
+      );
+  }
+}
+```
+
+Factory jest samodzielnym wzorcem, który technicznie nie jest sprzężony z builderem, ale został wykorzystany, żeby pomóc rozwiązać problem z utworzeniem wielu instancji buildera i przekazać serwis (logger) do buildera.
+
+### Wzorzec obserwatora
+
+Wzorzec obserwatora umożliwia powiadamianie grupy obiektów przez obiekt centralny, gdy coś się wydarzy.
+
+Wzorzec korzysta z dwóch rodzajów klas:
+
+- Subject
+- Observer
+
+### Klasa obserwatora
+
+Podczas starty walki rejestruje obserwatora w GameCommand i przekazuje go do GameApplication:
+
+```
+$xpObserver = new XpEarnedObserver(
+    new XpCalculator()
+);
+
+$this->game->subscribe($xpObserver);
+```
+
+Metoda subsctribe dodaje obserwatora do tablicy obserwatorów i w finishFightResult() wykonuje operacje na obserwatorze notify():
+
+```
+private function finishFightResult(FightResult $fightResult, Character $winner, Character $loser): FightResult
+{
+    $fightResult->setWinner($winner);
+    $fightResult->setLoser($loser);
+
+    $this->notify($fightResult);
+
+    return $fightResult;
+}
+private function notify(FightResult $fightResult): void
+{
+    foreach ($this->observers as $observer) {
+        $observer->onFightFinished($fightResult);
+    }
+}
+```
+
+Metoda notify() wykonuje zadanie na obserwatorze, które jest zadeklarowane w klasie obserwatora XpEarnedObserver.
+
+### Obserwator w Symfony + Korzyści
+
+Rejestrację obserwatora można przeprowadzić na kilka sposobów:
+
+- w kodzie wybranej metody
+- w services.yaml
+- w Kernel.php
+
+Najprostsza jest rejestracja w metodzie klasy, ale obserwotor jest na stałe przytwierdzony do klasy:
+
+```
+protected function execute(InputInterface $input, OutputInterface $output): int
+{
+  $xpObserver = new XpEarnedObserver(
+      new XpCalculator()
+  );
+  $this->game->subscribe($xpObserver);
+}
+```
+
+Obserwatora można również zarejestrować w services.yaml, ale każdy nowy obserwator musiałby być ręcznie dodawany do tego pliku:
+
+```
+App\GameApplication:
+  calls:
+    - subscribe: ['@App\Observer\XpEarnedObserver']
+```
+
+Ostatnim sposobem jest automatyczna rejesracja w Kernel.php:
+
+```
+protected function build(ContainerBuilder $container)
+{
+  $container->registerForAutoconfiguration(GameObserverInterface::class)
+    ->addTag('game.observer');
+}
+```
+
+Dodanie automatycznej obsługi subscribe dla obserwatorów:
+
+```
+public function process(ContainerBuilder $container)
+{
+  $definition = $container->findDefinition(GameApplication::class);
+  $taggedObservers = $container->findTaggedServiceIds('game.observer');
+  foreach ($taggedObservers as $id => $tags) {
+    $definition->addMethodCall('subscribe', [new Reference($id)]);
+  }
+}
+```
+
+### Publish-Subscriber (PubSub)
+
+Wariant wzorca obserwator. Pomiędzy obiektem Subject a Observers występuje Event Dispatcher.
+
+### Klasa PubSub Event i Subscribers w Symfony
+
+EventListener nie potrzebuje być rozszerzanym przez jakieś klasy bazowe, ani nie potrzebuje dziedziczyć interfesju, ale klasa subscribera potrzebuje.
+Gdy utworzy się klasę subscribera: *OutputFightStartingSubscriber* to implementuje *EventSubscriberInterface*.
+
+```
+class OutputFightStartingSubscriber implements EventSubscriberInterface
+{
+  public function onFightStart(FightStartingEvent $event)
+  {
+    $io = new SymfonyStyle(new ArrayInput([]), new ConsoleOutput());
+    $io->note('Fight is starting against ' . $event->ai->getNickname());
+  }
+  
+  public static function getSubscribedEvents(): array
+  {
+    return [
+        FightStartingEvent::class => 'onFightStart',
+    ];
+  }
+}
+```
+
+Metoda getSubscribedEvents mówi co ma się wydarzyć jeśli dojdzie do Eventu *FightStartingEvent*. W tym wypadku zostanie wywołana metoda *onFightStart*.
+
+### Wzorzec dekorator
+
+Wzorzec dekoratora przypomina atak typu man-in-the-middle. Zastępujesz klasę niestandardową implementacją, uruchamiasz kod, a następnie wywołujesz prawdziwą metodę.
+
+```
+$xpCalculator = new XpCalculator();
+$xpCalculator = new OutputtingXpCalculator($xpCalculator);
+$this->game->subscribe(new XpEarnedObserver($xpCalculator));
+```
+
+Tu użyto zasady OCP oraz współpracy z wzorcem Obserwatora (Wspólny Interface, klasa XpCalculator jest rozszerzana przez klasę OutputtingXpCalculator).
+
+Do użycia wzorca Dekoratora jest potrzebny Interface
+
+### Dekorator z Symfony Container
+
+W celu automatyzacji dodawania dekoratora do kontenera symfony, trzeba dodać alias do services.yaml:
+
+```
+App\Service\XpCalculatorInterface: '@App\Service\OutputtingXpCalculator'
+```
+
+Teraz autowire działa także dla OutputtingXpCalculator, bo w jego konstruktorze jest przekazany Interface. Aby nie było pętli zastępowania samego siebie samym sioebie trzeba dodać wyjątek w services.yaml:
+
+```
+App\Service\OutputtingXpCalculator:
+  arguments:
+    $innerCalculator: '@App\Service\XpCalculator'
+```
+
+### Dekorator: Nadpisywanie wbudowanych usług oraz AsDecorator
+
+Nadpisanie EventDispatchera który korzysta z interfejsu.
+
+```
+use Symfony\Component\DependencyInjection\Attribute\AsDecorator;
+
+#[AsDecorator('event_dispatcher')]
+class DebugEventDispatcherDecorator implements EventDispatcherInterface
+```
+
+AsDecorator pozwala na przekazanie nowego, rozszerzonego dispatchera i korzystanie z oryginalnego event_dispatcher.
+
+AsDecorator można użyć z outputtingXpCalculator dodając w services.yaml:
+
+```
+App\Service\XpCalculatorInterface: '@App\Service\XpCalculator'
+```
+
+Przez to, że usunięto starą konfigurację dekoratora, teraz można dodać dekorator przez AsDecorator:
+
+```
+use Symfony\Component\DependencyInjection\Attribute\AsDecorator;
+
+#[AsDecorator(XpCalculatorInterface::class)]
+class OutputtingXpCalculator implements XpCalculatorInterface
+```
