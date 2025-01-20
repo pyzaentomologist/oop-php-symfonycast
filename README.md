@@ -1204,3 +1204,405 @@ use Symfony\Component\DependencyInjection\Attribute\AsDecorator;
 #[AsDecorator(XpCalculatorInterface::class)]
 class OutputtingXpCalculator implements XpCalculatorInterface
 ```
+
+## (course 7) Design Patterns 2
+
+### Wstęp
+
+Kurs zaprezentuje 5 wzorców projektowych.
+
+3 wzorce behawioralne:
+
+- Command
+- Chain of Responsibility
+- State
+
+Te wzorce pomogą wydzielać klasy które mogą wchodzić w interakcje z innymi klasami.
+
+2 wrzorce twórczy:
+
+- Factory
+- NullObject
+
+### Command Pattern
+
+Wzorzec poleceń hermetyzuje zadanie w obiekcie, oddzielając od siebie to, co robi, jak to robi i kiedy zostanie wykonane. Ułatwia także cofanie działań, ponieważ może przechowywać historię zmian.
+
+Na wzorzec składają się 3 główne metody
+
+- interfejs poleceń - Command Interface to metoda execute();
+- komenda - Concrete commands to metody implementujące interfejs poleceń i przechowujące logikę zadania
+- obiekt wywołujący - invoker object przechowuje odwołanie do polecenia i wykonuje funkcję execute();
+
+Dodatkowe metody to:
+
+- Odbiorca
+- Klient
+
+Te metody nie są bardzo potrzebne.
+
+Najprostrzym przykłądem jest zmiana switch-case na obsługę klasową:
+
+```
+public function pressButton(string $button)
+{
+  switch ($button) {
+    case 'turnOn':
+      $this->powerOnDevice($this->tv->getAddress())
+      $this->tv->initializeSettings();
+      $this->tv->turnOnScreen();
+      $this->tv->openDefaultChannel();
+      break;
+    case 'turnOff':
+      $this->tv->closeApps();
+      $this->tv->turnOffScreen();
+      $this->powerOffDevice($this->tv->getAddress())
+      break;
+    case 'mute':
+      $this->tv->toggleMute();
+      break;
+    ...
+  }
+}
+```
+
+Każdy przycisk to osobna klasa.
+Implementacja metody pressButton która wywołuje metodę execute na prekazanym przycisku:
+
+```
+/**
+ * @param array<string, ButtonCommandInterface> $commands
+ */
+public function __construct(private array $commands)
+{
+}
+
+public function pressButton(string $button)
+{
+  if (!isset($this->commands[$button])) {
+    throw new NotSupportedButtonException($button);
+  }
+  
+  $this->commands[$button]->execute($this->tv);
+}
+```
+
+Obsługa za pomocą kodu:
+
+```
+$remote = new Remote([
+  'turnOn' => new TurnOnCommand(),
+  'turnOff' => new TurnOffCommand(),
+  'mute' => new MuteCommand(),
+]);
+
+$remote->pressButton('mute'); // executes MuteCommand logic
+```
+
+Wzorzec Command hermetyzuje żądanie jako obiekt, który oddziela metodę wywołującą od metody wywoływanej. Umożliwia także kolejkowanie i cofanie operacji poprzez przechowywanie poleceń i ich stanu.
+
+### Dodawanie akcji do gry
+
+Rekomendowane jest przekazywanie argumentów do konstruktora, a nie do metody execute(), by oddzielić instancję od wykonania metody.
+
+Przekazując argumenty konstruktorowi, możesz w pewnym momencie utworzyć instancję poleceń i wykonać je później, nie martwiąc się o ich argumenty.
+
+Nie jest to praktyczna zasada, ponieważ w zależności od aplikacji możesz nie mieć wszystkich argumentów podczas tworzenia instancji.
+
+### Implementacja większej liczby akcji
+
+Dodanie obsługi dla większej liczby klas:
+
+```
+$actionChoice = GameApplication::$printer->choice('Your turn', [
+  'Attack',
+  'Heal',
+  'Surrender',
+]);
+$playerAction = match ($actionChoice) {
+  'Attack' => new AttackCommand($player, $ai, $fightResultSet),
+  'Heal' => new HealCommand($player),
+  'Surrender' => new SurrenderCommand($player),
+};
+$playerAction->execute();
+```
+
+### Cofanie komend z akcją
+
+Wartości do cofnięcia przechowuje się w zmiennych klasy. 
+Podczas implementowania funkcji cofania kluczowe jest przechowywanie jakiegoś stanu lub danych, ponieważ system musi wiedzieć, jakie rzeczy należy cofnąć.
+
+### Command Pattern w realnym wykorzystaniu
+
+Zalety:
+
+- Hermetyzuje metody w obiektach
+- pozwala na logiczne rozdzielenie "czegoś" od "jak" i "kiedy",
+- obsługuje cofanie
+- wspiera SRP i OCP
+
+Wady:
+
+- Zwiększona złożoność kodu
+- każde polecenie to nowa klasa
+
+### Chain of Responsibility Pattern
+
+Łańcuch odpowiedzialności to sposób na ustawienie sekwencji metod do wykonania, przy czym każda metoda może zdecydować o wykonaniu kolejnej w łańcuchu lub całkowitym zatrzymaniu sekwencji.
+
+Łańcuch odpowiedzialności dzieli sie na trzy części:
+
+- Handler interface:
+  - Zawiera dwie metody (setNext() i handle())
+- Concrete handlers
+  - implementuje handler interface
+- Client
+  - dodaje łańcuch, zatwierdza kolejność działania i wywołuje pierwszy handler
+
+Łańcuch odpowiedzialności służy do tworzenia sekwencji procedur obsługi, z których każda może albo przetworzyć żądanie, przekazać je do następnej procedury obsługi, albo zatrzymać sekwencję.
+
+### Wywołanie łańcucha odpowiedzialności
+
+W konstruktorze utworzono kolejność sprawdzanych warunków:
+
+```
+public function __construct(private readonly CharacterBuilder $characterBuilder)
+{
+  $this->difficultyContext = new GameDifficultyContext();
+
+  $casinoHandler = new CasinoHandler();
+  $levelHandler = new LevelHandler();
+  $onFireHandler = new OnFireHandler();
+
+  $casinoHandler->setNext($levelHandler);
+  $levelHandler->setNext($onFireHandler);
+
+  $this->xpBonusHandler = $casinoHandler;
+}
+```
+
+### Konfiguracja CoR w Symfony
+
+Konfiguracja odbywa sie za pomocą atrybutu autoconfigure w klasach któe mają być ogniwami łańcucha (oprócz ostatniego ogniwa):
+
+> #[Autoconfigure()]
+
+```
+#[Autoconfigure(
+  calls: [['setNext' => ['@'.OnFireHandler::class]]]
+)]
+```
+
+Wywołanie łańcucha odbywa sie przez atrybut autowire w kontruktorze:
+
+> #[Autowire(service: CasinoHandler::class)]
+
+```
+public function __construct(
+  #[Autowire(service: CasinoHandler::class)]
+  private readonly XpBonusHandlerInterface $xpBonusHandler,
+  private readonly CharacterBuilder $characterBuilder
+) {
+  $this->difficultyContext = new GameDifficultyContext();
+}
+```
+
+#### Null Object Pattern
+
+Dodatkowym wzorcem jest zwracanie wartości jak najbardzie zbliżonej do nulla dla stringa to będzie pusty string, dla int to będzie 0 itd.
+
+Tworzy sie klasę która zwróci np. 0 jeśli jakaś akcja nie przyniesie zysku dla gracza w postaci doświadczenia.
+
+Atrybut #[Autoconfigure] PHP w Symfony pomaga w automatycznej konfiguracji usług. Może definiować wywołania metod, znaczniki i inne elementy bez ręcznej konfiguracji w kontenerze usług.
+
+Wzorzec Null Object jest doskonałym narzędziem do usuwania kontroli zerowych. Zamiast sprawdzać, czy właściwość jest ustawiona, możesz początkowo ustawić ją na fikcyjną implementację interfejsu i wywoływać na niej metody, tak jakby był to prawdziwy obiekt.
+
+### Kuzyn wzorca Chain of Responsibility - wzorzec *Middleware*
+
+Krótko mówiąc, wszystkie Middleware zostaną wykonane, a ich użycie to świetny sposób na zwiększenie elastyczności aplikacji.
+Mogą być użyte np. do nadania postaci losowej broni, zwiększenia jej poziomu, zwiększenia jej zdrowia.
+
+Zalety CoR:
+
+- umożliwia dynamiczne dodawanie lub usuwanie handlerów poprzez zmianę członków lub kolejności łańcucha.
+- wykorzystuje również zasadę pojedynczej odpowiedzialności, która pozwala nam oddzielić klasy, które działają, od klas, które z nich korzystają.
+- wykorzystuje zasadę Otwarty/Zamknięty. Dzięki temu możemy wprowadzać nowe moduły obsługi do aplikacji bez dotykania istniejącego kodu.
+
+Wady:
+
+- ciężki kod do debugowania
+- rządania mogą być nieprzetworzone, jeśli nie będzie obiektów do obsługi
+- jeśli łańcuch jest zbyt długi, będzie to miało negatywny pływ na wydajność
+
+Middleware wykonuje wszystkie procedury obsługi, podczas gdy CoR może się zatrzymać, gdy procedura obsługi przetworzy żądanie i nie wywoła następnego.
+
+### The State Pattern
+
+Stan to sposób zorganizowania kodu w taki sposób, aby obiekt mógł zmienić swoje zachowanie, gdy zmieni się jego stan wewnętrzny. Pomaga reprezentować różne stany jako osobne klasy i pozwala obiektowi płynnie przełączać się między tymi stanami.
+
+Wzorzec składa się z 3 elementów:
+
+- klasa kontekstowa reprezentująca obiekt, którego zachowanie zmienia się w zależności od jego stanu wewnętrznego, i zawiera odwołanie do obiektu bieżącego stanu.
+- wspólny interfejs dla wszystkich konkretnych klas stanów. Deklaruje metody reprezentujące akcje, które można podjąć w każdym stanie.
+- konkretne stany, gdzie każda klasa reprezentuje stan kontekstu.
+
+Zmiana kodu z:
+
+```
+public function publishPost(Article $article) {
+  if ($article->getStatus() === 'draft') {
+    $article->setStatus('moderation');
+    $this->notifyModerator();
+  } elseif ($article->getStatus() === 'moderation') {
+    if ($this->getCurrentUser()->isAdmin()) {
+      $article->setStatus('published');
+    } 
+    $this->sendTweet($article);
+  } elseif ($article->getStatus() === 'published') {
+    throw new AlreadyPublishedException();
+  }
+}
+```
+
+na obsługę dla poszczególnych klas:
+
+```
+class DraftState implements StateInterface {
+  public function publish(Article $article) {
+    $article->setStatus('moderation');
+    $this->notifyModerator();
+  }
+}
+```
+
+### Radzenie sobie z trudnościami związanymi ze wzorcem State
+
+Co jeśli miałyby jakieś zależności?
+Co, jeśli ich stworzenie było drogie?
+
+Jeśli stany są proste do utworzenia to wzorzec można zaimplementować niskim kosztem.
+Jeśli stany potrzebują rozbudowanej logiki, udziału zewnętrznych zależności to lepiej użyć atrybutu AutowireLocation.
+Jeśli za każdym razem potrzebujesz świeżego obiektu stanu, użyj fabryki, aby go utworzyć i wstrzyknij go do GameDifficultyContext.
+
+### State w realnym świecie
+
+Symfony ma wbudowany komponent Symfony Workflow, obsługiwany przez plik yaml.
+Wzorce stanu i strategii są ze sobą powiązane, ale główną różnicą jest cel jaki za nimi stoi. Porównując do działania do auta stan monitoruje czy pedały są wciśnięte, czy silnik działa, a strategia monitoruje czy jedziemy na silniku spalinowym, czy elektrycznym.
+
+Główna różnica strukturalna polega na tym, że obiekty stanu mogą mieć odniesienia do innych stanów. Umożliwia to obiektowi przejście między stanami. Natomiast Strategia skupia się na wyborze konkretnego algorytmu lub zachowania, bez zmiany stanu systemu.
+
+Zalety stanu:
+
+- wzorzec Stan pozwala obiektom na zmianę zachowania, gdy zmienia się ich stan wewnętrzny, a nawet może ukryć stan, w jakim znajduje się obiekt.
+- jest to także świetny sposób na uniknięcie używania dużych bloków if-else.
+- wykorzystuje SRP i OCP
+
+Wady:
+
+- w prostych przypadkach może to być przesada
+- może wprowadzić znaczną liczbę klas.
+
+### Factory Pattern
+
+Fabryka jest wzorcem twórczym (creational pattern). Zamiast bezpośrednio tworzyć instancje obiektów za pomocą new, używamy fabryki, która decyduje, który obiekt utworzyć na podstawie danych wejściowych.
+
+Wzór Factory składa się z pięciu części:
+
+- interfejs produktów, które chcemy stworzyć. Gdybyśmy na przykład chcieli stworzyć broń dla naszych postaci, mielibyśmy interfejs broni, a produktami byłaby broń.
+- konkretne produkty implementujące interfejs. W tym przykładzie mielibyśmy klasy takie jak Sword, Axe, Bow i tak dalej.
+- interfejs fabryczny. Jest to opcjonalne, ale bardzo przydatne, gdy trzeba utworzyć rodziny produktów.
+- konkretna fabryka, która wdraża interfejs fabryczny, jeśli taki posiadamy. Ta klasa wie wszystko o tworzeniu produktów.
+- klient, który wykorzystuje fabrykę do tworzenia obiektów produktowych. Ta klasa wie tylko, jak używać produktów, ale nie wie, w jaki sposób są one tworzone ani jakiego konkretnego produktu używa.
+
+Istnieje więcej niż jeden wariant wzorca Fabryka. Najprostszym wariantem jest fabryka z wieloma metodami make() – po jednej dla każdego możliwego produktu. Ta fabryka wyglądałaby tak:
+
+```
+class WeaponFactory
+{
+  public function makeSword(): WeaponInterface
+  {
+    return new Sword(Dice::rollRange(4, 8), 12);
+  }
+
+  public function makeAxe(int $bonusDamage = 0): WeaponInterface
+  {
+    return new Axe($bonusDamage + Dice::rollRange(6, 12), 8);
+  }
+}
+```
+
+Innym podejściem jest użycie metody pojedynczego tworzenia. To otrzyma argument i określi, który obiekt musi utworzyć. Jest to przydatne, gdy aplikacja jest bardziej dynamiczna. Wartość $type może pochodzić z danych wejściowych użytkownika, żądania lub czegoś innego.
+Jednakże istnieje kilka wad tego podejścia, takich jak utrata bezpieczeństwa typu, ponieważ jako typ można wysłać dowolny ciąg znaków. Na szczęście można to rozwiązać za pomocą dobrego zestawu testów lub przekształcając ciąg znaków w *enum*. Trudno jest również mieć różne argumenty konstruktora dla każdego typu.
+
+Ostatnim wariantem, o którym będziemy mówić, jest „Fabryka Abstrakcyjna”. W tym podejściu mamy wiele fabryk wdrażających ten sam interfejs, a każda betonowa fabryka tworzy rodzinę obiektów. W naszym przykładzie broni postaci moglibyśmy pogrupować broń na podstawie materiału, z którego jest wykonana, np. żelaza lub stali, a każda fabryka produkowałaby broń tylko z tego materiału.
+
+Wzorzec Fabryka jest wzorcem twórczym, który obejmuje proces tworzenia obiektów. Ukrywa szczegóły tworzenia przed klientem i zapewnia scentralizowany sposób tworzenia instancji obiektów.
+
+Fabryka z wieloma metodami make jest łatwiejsza w użyciu i pozwala na posiadanie różnych argumentów konstruktora w każdym wariancie. Jednak dużym minusem jest to, że klient musi wiedzieć, jaki przedmiot jest wymagany do wykonania pracy:
+
+```
+class WeaponFactory
+{
+  public function makeSword(): WeaponInterface
+  {
+    return new Sword(Dice::rollRange(4, 8), 12);
+  }
+
+  public function makeAxe(int $bonusDamage = 0): WeaponInterface
+  {
+    return new Axe($bonusDamage + Dice::rollRange(6, 12), 8);
+  }
+}
+```
+
+### The Abstract Factory Pattern
+
+Dzięki atrybutowa #[AsAlias()] można podać do symfony informację którą fabrykę chcemy wstrzyknąć jako domyślną.
+W CharacterBuilder w konstruktorze podaję jako argument klasę na bazie interfejsu:
+
+```
+class CharacterBuilder
+{
+  private int $maxHealth;
+  private int $baseDamage;
+  private array $attackTypes;
+  private string $armorType;
+  private int $level;
+
+  public function __construct(private AttackTypeFactoryInterface $attackTypeFactory)
+  {
+  }
+}
+```
+
+Symfony nie wie o którą klasę chodzi, a są dwie: UltimateAttackTypeFactory oraz AttackTypeFactory, dlatego mogę ją automatycznie zadeklarować w AsAlias():
+
+Abstrakcyjny wzorzec fabryki umożliwia zarządzanie rodzinami powiązanych obiektów (AttackType). W tym przypadku gra ma dwie fabryki, AttackTypeFactory i UltimateAttackTypeFactory, które można zamienić w czasie wykonywania, aby zapewnić różne typy obiektów AttackType bez zauważania tego przez klienta.
+
+```
+#[AsAlias(AttackTypeFactoryInterface::class)]
+class AttackTypeFactory implements AttackTypeFactoryInterface
+```
+
+### Factory Pattern w realnym swiecie
+
+[Dokumentacja symfony - Factories](https://symfony.com/doc/current/service_container/factories.html "Dokumentacja symfony - Factories")
+
+Zalety fabryki:
+
+- to świetny sposób na oddzielenie kodu tworzącego obiekty od kodu, który je wykorzystuje.
+- bardzo pomocne, gdy trzeba utworzyć różne rodziny obiektów.
+- wykorzystuje zasady SRP i OCP.
+
+Wady:
+
+- może to jednak sprawić, że baza kodu stanie się bardziej złożona, zwłaszcza jeśli masz wiele fabryk.
+
+Symfony pozwala na zdefiniowanie fabryk poprzez opcję fabryki w definicji usługi. Pierwszy argument to klasa fabryczna, która zostanie utworzona (lub użyta bezpośrednio, jeśli jest to fabryka statyczna) przez Symfony i wywoła metodę określoną w drugim argumencie. Oto przykład statycznej deklaracji fabryki:
+
+```
+# config/services.yaml
+services:
+  App\Ecommerce\PaymentProcessor:
+    factory: ['App\Ecommerce\PaymentProcessorStaticFactory', 'createPaymentProcessor']
+```
